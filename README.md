@@ -28,9 +28,12 @@ Stopping stats printer.
 Stopping memory stats collector.
 ```
 
+The package can be easily included in custom code for more exciting tests.
+
 ### TODO
 - Adopt the **logrus** package
 - Let the user print the metrics on a separate file
+- Add tests
 
 ### Author
 Gianni Salinetti <gbsalinetti@extraordy.com>
