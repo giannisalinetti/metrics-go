@@ -48,7 +48,9 @@ func (m *MemoryMonitor) GetStats(ch chan bool, freq int64, wg *sync.WaitGroup) {
 		select {
 		case <-ch:
 			fmt.Println("Stopping memory stats collector.")
-			wg.Done()
+			if wg != nil {
+				wg.Done()
+			}
 			return
 		default:
 			time.Sleep(time.Duration(freq) * time.Millisecond)
@@ -90,8 +92,11 @@ func StatsManager(mon Metrics, printFreq int64, stop chan bool, wg *sync.WaitGro
 		getFreq = printFreq
 	}
 
-	//Use a goroutine to update Monitor every 100 milliseconds
-	wg.Add(1)
+	// If WaitGroup is not nil add a goroutine instance to the delta
+	if wg != nil {
+		wg.Add(1)
+	}
+	//Use a goroutine to update MemoryMonitor struct
 	go mon.GetStats(stop, getFreq, wg)
 
 	for {
@@ -101,7 +106,9 @@ func StatsManager(mon Metrics, printFreq int64, stop chan bool, wg *sync.WaitGro
 			//Since the data in the channel has been consumed we also send a new
 			//signal to the GetStats goroutine
 			stop <- true
-			wg.Done()
+			if wg != nil {
+				wg.Done()
+			}
 			return
 		default:
 			time.Sleep(time.Duration(printFreq) * time.Millisecond)
