@@ -22,6 +22,7 @@ func businessLogic() error {
 
 func main() {
 	freqFlag := flag.Int64("f", 1000, "Print frequency")
+	outputFlag := flag.String("o", "", "Ouput file")
 	flag.Parse()
 
 	//Define a stop channel to handle the StatsManager
@@ -37,7 +38,7 @@ func main() {
 	//StatsManager should run in the background, letting the main program
 	//logic do something else.
 	wg.Add(1)
-	go monitor.StatsManager(mmon, *freqFlag, stopCh, wg)
+	go monitor.StatsManager(mmon, *outputFlag, *freqFlag, stopCh, wg)
 
 	//Businesslogic goes here, running in foreground
 	err := businessLogic()
