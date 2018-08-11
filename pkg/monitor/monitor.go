@@ -1,8 +1,7 @@
-package main
+package monitor
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"log"
 	"runtime"
@@ -10,6 +9,7 @@ import (
 	"time"
 )
 
+// MemoryMonitor is a struct for memory metrics collection
 type MemoryMonitor struct {
 	Alloc,
 	TotalAlloc,
@@ -23,16 +23,20 @@ type MemoryMonitor struct {
 	mutex        sync.RWMutex
 }
 
+// Metrics define a common interface for metrics
 type Metrics interface {
 	GetStats(ch chan bool, freq int64, wg *sync.WaitGroup)
 	PrintStats() (string, error)
 }
 
+// NewMemoryMonitor return a *MemoryMonitor pointer
 func NewMemoryMonitor() *MemoryMonitor {
 	//Return an empty Monitor struct
 	return &MemoryMonitor{}
 }
 
+// GetStats collects stats using the runtime package. It is designed to be
+// executed as a goroutine.
 func (m *MemoryMonitor) GetStats(ch chan bool, freq int64, wg *sync.WaitGroup) {
 
 	//Load data into runtime.MemStats struct
@@ -66,6 +70,7 @@ func (m *MemoryMonitor) GetStats(ch chan bool, freq int64, wg *sync.WaitGroup) {
 	}
 }
 
+// PrintStats returns a json string with the data loaded in MemoryMonitor
 func (m *MemoryMonitor) PrintStats() (string, error) {
 	output, err := json.Marshal(m)
 	if err != nil {
@@ -74,11 +79,9 @@ func (m *MemoryMonitor) PrintStats() (string, error) {
 	return string(output), nil
 }
 
-//StatsManager manages a metrics interface and can be used with different
-//kind of runtime data (memory, cpu, etc)
+// StatsManager manages a metrics interface and can be used with different
+// kind of runtime data (memory, cpu, etc)
 func StatsManager(mon Metrics, printFreq int64, stop chan bool, wg *sync.WaitGroup) {
-	//Allocate a channel to control GetStats function
-
 	//Set default collection time to 100 milisecongs
 	var getFreq int64 = 100
 
@@ -109,41 +112,4 @@ func StatsManager(mon Metrics, printFreq int64, stop chan bool, wg *sync.WaitGro
 			log.Println(res)
 		}
 	}
-}
-
-func businessLogic() error {
-	for i := 0; i < 3; i++ {
-		time.Sleep(1 * time.Second)
-		fmt.Println("Doing some crazy stuff...")
-	}
-	return nil
-}
-
-func main() {
-	freqFlag := flag.Int64("f", 1000, "Print frequency")
-	flag.Parse()
-
-	//Define a stop channel to handle the StatsManager
-	stopCh := make(chan bool)
-	defer close(stopCh)
-
-	wg := &sync.WaitGroup{}
-
-	//Allocate new MemoryMonitor
-	mmon := NewMemoryMonitor()
-
-	//StatsManager should run in the background, letting the main program
-	//logic do something else.
-	wg.Add(1)
-	go StatsManager(mmon, *freqFlag, stopCh, wg)
-
-	//Businesslogic goes here, running in foreground
-	err := businessLogic()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	//Send a signal to cascading stop the goroutines
-	stopCh <- true
-	wg.Wait()
 }
