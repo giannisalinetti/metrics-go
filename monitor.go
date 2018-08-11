@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"log"
 	"runtime"
 	"sync"
 	"time"
@@ -23,7 +24,7 @@ type MemoryMonitor struct {
 }
 
 type Metrics interface {
-	GetStats(ch chan bool, freq int64)
+	GetStats(ch chan bool, freq int64, wg *sync.WaitGroup)
 	PrintStats() (string, error)
 }
 
@@ -32,7 +33,7 @@ func NewMemoryMonitor() *MemoryMonitor {
 	return &MemoryMonitor{}
 }
 
-func (m *MemoryMonitor) GetStats(ch chan bool, freq int64) {
+func (m *MemoryMonitor) GetStats(ch chan bool, freq int64, wg *sync.WaitGroup) {
 
 	//Load data into runtime.MemStats struct
 	rtm := runtime.MemStats{}
@@ -43,6 +44,7 @@ func (m *MemoryMonitor) GetStats(ch chan bool, freq int64) {
 		select {
 		case <-ch:
 			fmt.Println("Stopping memory stats collector.")
+			wg.Done()
 			return
 		default:
 			time.Sleep(time.Duration(freq) * time.Millisecond)
@@ -74,7 +76,7 @@ func (m *MemoryMonitor) PrintStats() (string, error) {
 
 //StatsManager manages a metrics interface and can be used with different
 //kind of runtime data (memory, cpu, etc)
-func StatsManager(mon Metrics, printFreq int64, stop chan bool) {
+func StatsManager(mon Metrics, printFreq int64, stop chan bool, wg *sync.WaitGroup) {
 	//Allocate a channel to control GetStats function
 
 	//Set default collection time to 100 milisecongs
@@ -86,7 +88,8 @@ func StatsManager(mon Metrics, printFreq int64, stop chan bool) {
 	}
 
 	//Use a goroutine to update Monitor every 100 milliseconds
-	go mon.GetStats(stop, getFreq)
+	wg.Add(1)
+	go mon.GetStats(stop, getFreq, wg)
 
 	for {
 		select {
@@ -95,16 +98,25 @@ func StatsManager(mon Metrics, printFreq int64, stop chan bool) {
 			//Since the data in the channel has been consumed we also send a new
 			//signal to the GetStats goroutine
 			stop <- true
+			wg.Done()
 			return
 		default:
 			time.Sleep(time.Duration(printFreq) * time.Millisecond)
 			res, err := mon.PrintStats()
 			if err != nil {
-				fmt.Println(err)
+				log.Fatal(err)
 			}
-			fmt.Println(res)
+			log.Println(res)
 		}
 	}
+}
+
+func businessLogic() error {
+	for i := 0; i < 3; i++ {
+		time.Sleep(1 * time.Second)
+		fmt.Println("Doing some crazy stuff...")
+	}
+	return nil
 }
 
 func main() {
@@ -115,20 +127,23 @@ func main() {
 	stopCh := make(chan bool)
 	defer close(stopCh)
 
+	wg := &sync.WaitGroup{}
+
 	//Allocate new MemoryMonitor
 	mmon := NewMemoryMonitor()
 
 	//StatsManager should run in the background, letting the main program
 	//logic do something else.
-	go StatsManager(mmon, *freqFlag, stopCh)
+	wg.Add(1)
+	go StatsManager(mmon, *freqFlag, stopCh, wg)
 
-	//Main logic, running in foreground
-	for i := 0; i < 3; i++ {
-		time.Sleep(1 * time.Second)
-		fmt.Println("Doing some crazy stuff...")
+	//Businesslogic goes here, running in foreground
+	err := businessLogic()
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	//Send a signal to cascading stop the goroutines
 	stopCh <- true
-	time.Sleep(1 * time.Second)
+	wg.Wait()
 }
