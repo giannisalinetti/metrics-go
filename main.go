@@ -10,7 +10,7 @@ import (
 	"github.com/giannisalinetti/metrics-go/pkg/monitor"
 )
 
-// businessLogic is just a dummy function whose purpose is to print on screen
+// businessLogic is just a stub function whose purpose is to print on screen
 // something and return.
 func businessLogic() error {
 	for i := 0; i < 5; i++ {
